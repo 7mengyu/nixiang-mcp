@@ -2,7 +2,7 @@
 echo === Nixiang MCP Setup ===
 echo.
 
-REM 创建虚拟环境
+REM 创建虚拟环境（项目根目录）
 if not exist venv (
     echo [1/2] Creating virtual environment...
     python -m venv venv

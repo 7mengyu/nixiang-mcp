@@ -1,29 +1,19 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
 venv/
-.venv/
-ENV/
 
 # IDE
 .idea/
 .vscode/
-*.swp
-*.swo
+.claude/
 
 # Build
 dist/
 build/
 *.egg-info/
 
-# Test
-.pytest_cache/
-.coverage
-
-# dnlib download artifacts
+# dnlib download
 *.nupkg
 *.zip
 

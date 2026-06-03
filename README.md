@@ -1,190 +1,70 @@
-# dnlib MCP Server
+# Nixiang MCP
 
-[中文文档](README_CN.md)
+逆向工具 MCP Server 集合，为 AI 编程助手提供 .NET 程序集分析和 Cheat Engine 内存分析能力。
 
-MCP Server for .NET assembly analysis using dnlib and de4dot, integrated with AI coding assistants.
+## 项目结构
 
-## Supported Tools
-
-- **dnlib Backend**: Static analysis of .NET assemblies (type search, method decompilation, IL analysis)
-- **de4dot Backend**: .NET deobfuscator integration (detect + clean obfuscated assemblies)
-
-## Installation
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/7mengyu/dnlib-mcp.git
-cd dnlib-mcp
+```
+nixiang-mcp/
+├── dnlib-mcp/     ← .NET 程序集静态分析（dnlib + de4dot）
+├── ce-mcp/        ← Cheat Engine 分析插件 + MCP 后端
+└── docs/          ← 设计文档和提示词
 ```
 
-### 2. One-click setup
+## 快速开始
+
+### 安装
 
 ```bash
-# Windows: double-click setup.bat, or run:
-setup.bat
+git clone https://github.com/7mengyu/nixiang-mcp.git
+cd nixiang-mcp
+
+# 创建虚拟环境并安装依赖
+python -m venv venv
+venv\Scripts\pip install -r dnlib-mcp/requirements.txt
 ```
 
-This script will:
-- Create Python virtual environment
-- Install dependencies (mcp, pythonnet)
+### 启动
 
-### 3. (Optional) Compile de4dot
-
-de4dot.exe and dependencies are already included in `de4dot/`. If you need to recompile:
+在项目目录启动 Claude Code：
 
 ```bash
-git clone https://github.com/0xd4d/de4dot.git
-cd de4dot
-dotnet build de4dot.netframework.sln -c Release
-# Copy output files to dnlib-mcp/de4dot/
-cp Release/net45/de4dot.exe ../dnlib-mcp/de4dot/
-cp Release/net45/de4dot.code.dll ../dnlib-mcp/de4dot/
-cp Release/net45/de4dot.blocks.dll ../dnlib-mcp/de4dot/
-cp Release/net45/de4dot.cui.dll ../dnlib-mcp/de4dot/
-cp Release/net45/de4dot.mdecrypt.dll ../dnlib-mcp/de4dot/
-cp Release/net45/AssemblyData.dll ../dnlib-mcp/de4dot/
-cp Release/net45/dnlib.dll ../dnlib-mcp/de4dot/
-```
-
-## Configuration
-
-This project uses `.mcp.json` for automatic MCP server registration. No manual configuration is needed.
-
-Simply start Claude Code in the project directory:
-
-```bash
-cd dnlib-mcp
 claude
 ```
 
-Claude Code will detect `.mcp.json` and prompt you to approve the `reverse-tools` server on first launch. Run `/mcp` to check status or approve.
+`.mcp.json` 会自动注册 `dnlib-mcp` 服务器。
 
-## Usage
+## 子项目
 
-### Auto-Initialization
+### dnlib-mcp
 
-The system automatically detects resources in the following locations (in order of priority):
+.NET 程序集静态分析，支持：
+- 类型/方法搜索和 IL 反编译
+- de4dot 混淆器检测和解混淆（22 种混淆器）
+- 存档加密密钥提取
 
-**dnlib.dll:**
-1. `DNLIB_PATH` environment variable
-2. Project root directory (`dnlib.dll` in the same folder as this README)
-3. Current working directory
+详见 [dnlib-mcp/README.md](dnlib-mcp/README.md)
 
-**de4dot.exe:**
-1. `DE4DOT_PATH` environment variable
-2. `de4dot/de4dot.exe` in project root
-3. `de4dot.exe` in project root
+### ce-mcp（开发中）
 
-### Available Tools
+Cheat Engine 分析插件，通过 TCP 桥接实现 AI 辅助游戏逆向：
+- 断点持续监控和写入路径分析
+- 汇编分析找基址
+- 加密数值反推算法
+- AOB + 注入脚本生成
 
-#### dnlib Tools
+详见 [docs/ce-design.md](docs/ce-design.md)
 
-| Tool | Description |
-|------|-------------|
-| `dnlib_status` | Check initialization status |
-| `dnlib_set_path` | Set dnlib.dll path (optional) |
-| `dnlib_load_assembly` | Load a .NET assembly (.dll/.exe) |
-| `dnlib_list_types` | List all types in assembly |
-| `dnlib_get_type` | Get type details (methods, fields, properties) |
-| `dnlib_search_types` | Search types by name pattern |
-| `dnlib_search_methods` | Search methods by name pattern |
-| `dnlib_decompile_method` | Decompile method to IL code |
-| `dnlib_get_entry_point` | Get assembly entry point (Main) |
-| `dnlib_list_resources` | List embedded resources |
+## 文档
 
-#### de4dot Tools
+| 文档 | 说明 |
+|------|------|
+| [CE 设计文档](docs/ce-design.md) | CE MCP 后端架构和场景设计 |
+| [CE 提示词](docs/ce-prompt.md) | CE 逆向分析提示词参考 |
 
-| Tool | Description |
-|------|-------------|
-| `de4dot_status` | Check de4dot initialization |
-| `de4dot_set_path` | Set de4dot.exe path (optional) |
-| `de4dot_detect` | Detect obfuscator type (-d mode, no modification) |
-| `de4dot_list_obfuscators` | List all supported obfuscator types |
-| `de4dot_deobfuscate` | Deobfuscate an assembly with full options (rename, cflow, strings, tokens) |
-| `de4dot_clean_strings` | Decrypt strings only, preserve structure |
-| `de4dot_batch_deobfuscate` | Batch process all .NET files in a directory |
-
-### Quick Start
-
-```
-加载程序集 D:\Games\SomeGame\Assembly-CSharp.dll
-```
-
-To check initialization:
-
-```
-检查 dnlib 状态
-检查 de4dot 状态
-```
-
-### Obfuscation Handling Workflow
-
-```
-# 1. Check if the assembly is obfuscated
-检测 D:\Game\Assembly-CSharp.dll 的混淆
-
-# 2. If obfuscated, deobfuscate it
-解混淆 D:\Game\Assembly-CSharp.dll
-
-# 3. Load the cleaned version for analysis
-加载程序集 D:\Game\Assembly-CSharp-cleaned.dll
-
-# 4. Analyze as usual
-搜索包含 "Save" 的类型
-```
-
-### Tips for Game Reverse Engineering
-
-#### Finding Save Encryption Keys (Mono/Unity)
-
-Typical workflow for extracting encryption keys from `Assembly-CSharp.dll`:
-
-**1. Load and search for save-related types:**
-```
-加载程序集 D:\Game\MyGame_Data\Managed\Assembly-CSharp.dll
-搜索包含 "Save" 的类型
-搜索包含 "Encrypt" 的类型
-搜索包含 "Crypto" 的类型
-```
-
-**2. Inspect suspected classes for hardcoded keys:**
-```
-查看 SaveManager 类的详细信息
-```
-
-Static fields often contain hardcoded keys or IV values. Pay attention to:
-- `static` fields of type `System.String` or `System.Byte[]`
-- Fields named `KEY`, `IV`, `SALT`, `SECRET`, `PASSWORD`
-
-**3. Decompile encryption methods to understand the algorithm:**
-```
-反编译 SaveManager.EncryptData 方法
-反编译 SaveManager.DecryptData 方法
-```
-
-**4. If keys are derived, trace the derivation logic by decompiling helper methods.**
-
-#### Common Search Keywords
-
-| Direction | Keywords |
-|-----------|----------|
-| Save/Load | Save, Load, Data, Progress, Slot, File |
-| Encryption | Encrypt, Decrypt, Crypto, AES, XOR, Cipher, Rijndael |
-| Serialization | Serialize, Deserialize, Json, Binary, Base64, Formatter |
-| Keys/Secrets | Key, IV, Salt, Secret, Password, Token, Hash |
-| Storage | Path, File, PersistentData, Application, SaveData |
-
-#### General Tips
-
-1. **Find key classes**: Search for terms like "Player", "Health", "Money", "Inventory", "Weapon"
-2. **Locate modifying methods**: Look for "Add", "Set", "Update", "Increase" method names
-3. **Analyze IL code**: Simple methods like `SetHealth(value)` are easy to understand in IL
-4. **Find entry points**: Entry point helps understand game initialization flow
-5. **Use with other tools**: Combine with dnSpy for visual decompilation, then use MCP for quick searches
-
-## Requirements
+## 环境要求
 
 - Python 3.10+
-- .NET Runtime (for dnlib backend via pythonnet)
-- Windows OS (for pythonnet CLR interop)
+- Windows 系统
+- .NET 运行时
+- Cheat Engine 7.0+（CE 分析功能需要）
