@@ -58,21 +58,45 @@ ce-plugin/
 ```cmd
 cd /d C:\Users\scydr\Desktop\123\nixiang-mcp\ce-mcp\ce-plugin
 
-:: x64 编译 (多文件)
-cl /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x64.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
+:: 清理上次编译产物（obj/lib/exp 会触发增量链接，可能导致冲突）
+del /q *.obj *.lib *.exp 2>nul
+
+:: x64 编译
+cl /utf-8 /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x64.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
+```
+
+3. 打开 **"x86 Native Tools Command Prompt for VS 2022"**（注：x86 和 x64 必须在各自对应的终端编译）并执行：
+
+```cmd
+cd /d C:\Users\scydr\Desktop\123\nixiang-mcp\ce-mcp\ce-plugin
+
+:: 清理上次编译产物
+del /q *.obj *.lib *.exp 2>nul
 
 :: x86 编译
 cl /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x86.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
 ```
 
 > `/TC` 强制将所有 `.c` 文件视为 C 源码。
+> `/O2` 可改为 `/Od /Zi` 来生成调试版本（保留符号，方便排查）。
 
 ### 方式 2：手动设置 vcvars
 
 ```cmd
-call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+:: x64 编译
+call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+:: 如果没有 Community 版，改用：
+:: call "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+
 cd /d C:\Users\scydr\Desktop\123\nixiang-mcp\ce-mcp\ce-plugin
-cl /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x64.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
+del /q *.obj *.lib *.exp 2>nul
+cl /utf-8 /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x64.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
+
+:: x86 编译（需要 x86 终端或 vcvars32.bat）
+call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
+cd /d C:\Users\scydr\Desktop\123\nixiang-mcp\ce-mcp\ce-plugin
+del /q *.obj *.lib *.exp 2>nul
+cl /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x86.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
 ```
 
 ### 方式 3：VS IDE 创建项目
@@ -88,6 +112,7 @@ cl /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugi
 
 | 参数 | 含义 |
 |------|------|
+| `/utf-8` | 源文件和执行字符集设为 UTF-8（消除中文注释警告） |
 | `/TC` | 强制 C 编译模式 |
 | `/LD` | 生成 DLL |
 | `/O2` | 优化速度 |
