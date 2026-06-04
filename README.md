@@ -6,9 +6,13 @@
 
 ```
 nixiang-mcp/
-├── dnlib-mcp/     ← .NET 程序集静态分析（dnlib + de4dot）
-├── ce-mcp/        ← Cheat Engine 分析插件 + MCP 后端
-└── docs/          ← 设计文档和提示词
+├── venv/                  ← 所有 MCP 共用的 Python 虚拟环境
+├── dnlib-mcp/             ← .NET 程序集静态分析（dnlib + de4dot）
+├── ce-mcp/                ← Cheat Engine 分析插件 + MCP 后端
+├── docs/                  ← 设计文档和提示词
+├── .mcp.json              ← MCP Server 注册配置（入口）
+├── requirements.txt       ← Python 依赖
+└── setup.bat              ← 一键安装脚本
 ```
 
 ## 快速开始
@@ -21,18 +25,20 @@ cd nixiang-mcp
 
 # 创建虚拟环境并安装依赖
 python -m venv venv
-venv\Scripts\pip install -r dnlib-mcp/requirements.txt
+venv\Scripts\pip install -r requirements.txt
 ```
+
+虚拟环境创建在项目根目录，`dnlib-mcp` 和 `ce-mcp` 共用同一个 venv。
 
 ### 启动
 
-在项目目录启动 Claude Code：
+在项目根目录启动 Claude Code：
 
 ```bash
 claude
 ```
 
-`.mcp.json` 会自动注册 `dnlib-mcp` 服务器。
+`.mcp.json` 会自动注册 `dnlib-mcp` 和 `ce-mcp` 两个 MCP Server。运行 `/mcp` 查看连接状态。
 
 ## 子项目
 
@@ -45,15 +51,15 @@ claude
 
 详见 [dnlib-mcp/README.md](dnlib-mcp/README.md)
 
-### ce-mcp（开发中）
+### ce-mcp
 
-Cheat Engine 分析插件，通过 TCP 桥接实现 AI 辅助游戏逆向：
-- 断点持续监控和写入路径分析
-- 汇编分析找基址
-- 加密数值反推算法
-- AOB + 注入脚本生成
+Cheat Engine 分析插件，通过 CE 插件 DLL + TCP 桥接实现 AI 辅助游戏逆向：
+- 进程模块枚举和寄存器快照
+- 反汇编和 AOB 特征码扫描
+- 硬件断点持续监控（写入/执行/读取路径分析）
+- 内存数据读取
 
-详见 [docs/ce-design.md](docs/ce-design.md)
+详见 [ce-mcp/ce-plugin/README.md](ce-mcp/ce-plugin/README.md)
 
 ## 文档
 
@@ -66,5 +72,5 @@ Cheat Engine 分析插件，通过 TCP 桥接实现 AI 辅助游戏逆向：
 
 - Python 3.10+
 - Windows 系统
-- .NET 运行时
-- Cheat Engine 7.0+（CE 分析功能需要）
+- .NET 运行时（dnlib-mcp 需要）
+- Cheat Engine 7.5+（ce-mcp 需要）

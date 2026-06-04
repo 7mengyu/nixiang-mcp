@@ -11,9 +11,11 @@
 
 ### 1. 克隆仓库
 
+`dnlib-mcp` 是 [nixiang-mcp](https://github.com/7mengyu/nixiang-mcp.git) 的子项目，从主仓库安装：
+
 ```bash
-git clone https://github.com/7mengyu/dnlib-mcp.git
-cd dnlib-mcp
+git clone https://github.com/7mengyu/nixiang-mcp.git
+cd nixiang-mcp
 ```
 
 ### 2. 一键安装
@@ -23,9 +25,7 @@ cd dnlib-mcp
 setup.bat
 ```
 
-脚本会自动：
-- 创建 Python 虚拟环境
-- 安装依赖（mcp、pythonnet）
+脚本会自动在项目**根目录**创建 Python 虚拟环境并安装依赖（mcp、pythonnet）。`dnlib-mcp` 和 `ce-mcp` 共用同一个 venv，无需在子目录重复创建。
 
 ### 3. （可选）编译 de4dot
 
@@ -49,16 +49,16 @@ cp Release/net45/dnlib.dll ../dnlib-mcp/de4dot/
 
 ## 配置
 
-项目使用 `.mcp.json` 自动注册 MCP 服务器，无需手动配置。
+MCP 服务器通过项目根目录的 `.mcp.json` 自动注册，无需手动配置。
 
-在项目目录启动 Claude Code 即可：
+在 nixiang-mcp **项目根目录**启动 Claude Code 即可：
 
 ```bash
-cd dnlib-mcp
+cd nixiang-mcp
 claude
 ```
 
-Claude Code 会自动检测 `.mcp.json`，首次启动时会提示批准 `reverse-tools` 服务器。运行 `/mcp` 查看状态或批准。
+Claude Code 会自动检测 `.mcp.json` 并注册 `dnlib-mcp` 服务器。运行 `/mcp` 查看状态。
 
 ## 使用
 
