@@ -201,7 +201,6 @@ Python MCP Server（`ce-mcp/src/server.py`）暴露了以下 MCP 工具：
 | `ce_assemble` | 汇编单条指令 -> 机器码字节 | ASSEMBLE |
 | `ce_prev_opcode` | 向前查找相邻指令地址 | PREV_OPCODE |
 | `ce_next_opcode` | 向后查找相邻指令地址 | NEXT_OPCODE |
-| `ce_md5_memory` | 内存区域 MD5 哈希 (完整性校验) | MD5_MEMORY |
 
 ### 断点与追踪
 | 工具 | 说明 | 对应命令 |
