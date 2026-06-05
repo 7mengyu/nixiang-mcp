@@ -162,6 +162,10 @@ void cmd_GET_PROCESS_LIST(Command *cmd) {
 /**
  * DISASSEMBLE:address,count
  * Disassembles `count` instructions starting at `address`.
+ *
+ * 使用 Zydis 独立反汇编引擎，不依赖 CE 内部的 Disassembler/disassembleEx
+ * （CE 7.5 的 C SDK Disassembler 在插件上下文中无法正常工作）。
+ * 直接从目标进程内存读取原始字节，用 Zydis 解码并格式化输出。
  */
 void cmd_DISASSEMBLE(Command *cmd) {
     char *addrStr = GetParam(cmd->params, 0);
@@ -173,9 +177,18 @@ void cmd_DISASSEMBLE(Command *cmd) {
     if (count > 100) count = 100;
     if (count < 1) count = 1;
 
-    /* Disassembler is a direct function pointer (not ppointer)
-     * CE 7.5 pluginexports.pas:793 */
-    if (!Exported.Disassembler) { ERR("disassembler not available"); return; }
+    /* 初始化 Zydis decoder + formatter */
+    ZydisDecoder decoder;
+#ifdef _WIN64
+    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64);
+#else
+    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LEGACY_32, ZYDIS_STACK_WIDTH_32);
+#endif
+
+    ZydisFormatter formatter;
+    ZydisFormatterInit(&formatter, ZYDIS_FORMATTER_STYLE_INTEL);
+    ZydisFormatterSetProperty(&formatter, ZYDIS_FORMATTER_PROP_FORCE_SEGMENT, ZYAN_FALSE);
+    ZydisFormatterSetProperty(&formatter, ZYDIS_FORMATTER_PROP_FORCE_SIZE, ZYAN_FALSE);
 
     char result[32768];
     int pos = 0;
@@ -185,43 +198,52 @@ void cmd_DISASSEMBLE(Command *cmd) {
 
     UINT_PTR current = addr;
     for (int i = 0; i < count; i++) {
-        char inst[256] = {0};
-        if (!Exported.Disassembler(current, inst, sizeof(inst) - 1)) {
-            /* CE 7.5 SDK 头中 Disassembler 声明为 direct fn ptr（L170），
-             * 但 pplugin.pas 中为 Nil（3.2.3.1）时实为 ppointer 方案。
-             * 若直接调用失败，走 disassembleEx 作为回退方案。 */
-            if (Exported.disassembleEx)
-                if (!Exported.disassembleEx((UINT_PTR)&current, inst, sizeof(inst) - 1))
-                    break;
-                else
-                    continue;
-            else
-                break;
+        /* 读最多16字节（x64最长指令为15字节）*/
+        BYTE code[16];
+        SIZE_T bytesRead = 0;
+        if (!RPM(*Exported.OpenedProcessHandle, (LPCVOID)current, code,
+                 sizeof(code), &bytesRead) || bytesRead == 0) {
+            if (i == 0) {
+                pos += sprintf_s(result + pos, sizeof(result) - pos, "]}");
+                ERR("read failed at 0x%llX", (unsigned long long)current);
+                return;
+            }
+            break;
         }
 
-        /* 如果 Disassembler 成功（不修改 current），用 disassembleEx
-         * 推进地址以获取下一条指令的起始位置。
-         * disassembleEx(address: pptrUint, ...) — pluginexports.pas:811
-         * 会解引用 *address 并在反汇编后写回更新值。 */
-        UINT_PTR next = current;
-        if (Exported.disassembleEx)
-            Exported.disassembleEx((UINT_PTR)&next, NULL, 0);
-        int instLen = (int)(next - current);
-        if (instLen <= 0) break;
+        /* Zydis 解码 */
+        ZydisDecodedInstruction insn;
+        ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT];
+        ZyanStatus status = ZydisDecoderDecodeFull(&decoder, code, bytesRead,
+                                                    &insn, operands);
+        if (!ZYAN_SUCCESS(status)) {
+            if (i == 0) break;
+            /* 不可解码，跳过1字节继续 */
+            current += 1;
+            continue;
+        }
 
-        BYTE raw[16] = {0};
-        SIZE_T bytesRead = 0;
-        RPM(*Exported.OpenedProcessHandle, (LPCVOID)current, raw, instLen, &bytesRead);
+        /* 格式化汇编文本 */
+        char asmBuf[256];
+        ZydisFormatterFormatInstruction(&formatter, &insn, operands,
+                                         insn.operand_count_visible,
+                                         asmBuf, sizeof(asmBuf),
+                                         current, ZYAN_NULL);
+
+        /* 输出字节 */
+        char bytesHex[64];
+        int bpos = 0;
+        for (ZyanU8 j = 0; j < insn.length && bpos < (int)sizeof(bytesHex) - 4; j++)
+            bpos += sprintf_s(bytesHex + bpos, sizeof(bytesHex) - bpos,
+                              "%s%02X", j > 0 ? " " : "", code[j]);
 
         pos += sprintf_s(result + pos, sizeof(result) - pos, "%s{", i > 0 ? "," : "");
         pos += sprintf_s(result + pos, sizeof(result) - pos,
-                         "\"offset\":\"0x%llX\",\"bytes\":\"",
-                         (unsigned long long)current);
-        for (SIZE_T j = 0; j < bytesRead && pos < (int)sizeof(result) - 20; j++)
-            pos += sprintf_s(result + pos, sizeof(result) - pos, "%02X", raw[j]);
-        pos += sprintf_s(result + pos, sizeof(result) - pos, "\",\"asm\":\"");
-        /* JSON-escape the asm string */
-        for (char *c = inst; *c && pos < (int)sizeof(result) - 4; c++) {
+                         "\"offset\":\"0x%llX\",\"bytes\":\"%s\",\"asm\":\"",
+                         (unsigned long long)current, bytesHex);
+
+        /* JSON-escape */
+        for (char *c = asmBuf; *c && pos < (int)sizeof(result) - 4; c++) {
             switch (*c) {
                 case '"':  pos += sprintf_s(result + pos, sizeof(result) - pos, "\\\""); break;
                 case '\\': pos += sprintf_s(result + pos, sizeof(result) - pos, "\\\\"); break;
@@ -239,7 +261,7 @@ void cmd_DISASSEMBLE(Command *cmd) {
         }
         pos += sprintf_s(result + pos, sizeof(result) - pos, "\"}");
 
-        current += instLen;
+        current += insn.length;
         if (pos >= (int)sizeof(result) - 200) break;
     }
 

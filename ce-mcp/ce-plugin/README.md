@@ -34,7 +34,18 @@ ce-plugin/
 ├── sdk/lualib.h          # Lua 标准库
 ├── sdk/lauxlib.h         # Lua 辅助库
 ├── sdk/luaconf.h         # Lua 配置
-└── sdk/lua.hpp           # Lua C++ 包装
+├── sdk/lua.hpp           # Lua C++ 包装
+├── sdk/zydis/            # Zydis 4.1.1 反汇编引擎（内嵌静态编译，替代 CE 7.5 失效的 Disassembler）
+│   ├── include/
+│   │   ├── Zydis/        # Zydis 公共头
+│   │   │   ├── Generated/
+│   │   │   └── Internal/
+│   │   └── Zycore/       # Zycore 基础库头
+│   │       ├── API/
+│   │       └── Internal/
+│   └── src/              # Zydis + Zycore 源文件（约30个.c）
+│       ├── Generated/    # .inc 生成数据表
+│       └── API/
 
 ../src/
 ├── server.py             # MCP Server (23 个工具)
@@ -49,6 +60,7 @@ ce-plugin/
 - **Visual Studio 2022 Build Tools**（提供 `cl.exe`、`link.exe`）
 - **Windows SDK**（提供 `ws2_32.lib`、`dbghelp.lib`）
 - **CE SDK 头文件**：已放在 `sdk/` 目录，无需额外配置
+- **Zydis 反汇编引擎**：已放在 `sdk/zydis/` 目录，无需额外配置（替代 CE 7.5 失效的 Disassembler）
 
 ### 方式 1：Developer Command Prompt（推荐）
 
@@ -61,11 +73,21 @@ cd /d C:\Users\scydr\Desktop\123\nixiang-mcp\ce-mcp\ce-plugin
 :: 清理上次编译产物（obj/lib/exp 会触发增量链接，可能导致冲突）
 del /q *.obj *.lib *.exp 2>nul
 
-:: 发布版
-cl /utf-8 /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x64.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
+:: 发布版 — 包含 Zydis 静态反汇编引擎
+cl /utf-8 /TC /LD /O2 /I"sdk\zydis\include" /I"sdk\zydis\src" ^
+    plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c ^
+    sdk\zydis\src\*.c sdk\zydis\src\API\*.c ^
+    /DZYDIS_STATIC_BUILD /DZYCORE_STATIC_BUILD ^
+    /Fe:ce-mcp-plugin-x64.dll ^
+    /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
 
 :: 调试版 (PDB 符号 + 禁用优化，出问题时用 VS 附加 CE 断点排查)
-cl /utf-8 /TC /LD /Od /Zi plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x64-debug.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
+cl /utf-8 /TC /LD /Od /Zi /I"sdk\zydis\include" /I"sdk\zydis\src" ^
+    plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c ^
+    sdk\zydis\src\*.c sdk\zydis\src\API\*.c ^
+    /DZYDIS_STATIC_BUILD /DZYCORE_STATIC_BUILD ^
+    /Fe:ce-mcp-plugin-x64-debug.dll ^
+    /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
 ```
 
 3. 打开 **"x86 Native Tools Command Prompt for VS 2022"**（注：x86 和 x64 必须在各自对应的终端编译）并执行：
@@ -77,10 +99,17 @@ cd /d C:\Users\scydr\Desktop\123\nixiang-mcp\ce-mcp\ce-plugin
 del /q *.obj *.lib *.exp 2>nul
 
 :: x86 编译
-cl /utf-8 /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x86.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
+cl /utf-8 /TC /LD /O2 /I"sdk\zydis\include" /I"sdk\zydis\src" ^
+    plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c ^
+    sdk\zydis\src\*.c sdk\zydis\src\API\*.c ^
+    /DZYDIS_STATIC_BUILD /DZYCORE_STATIC_BUILD ^
+    /Fe:ce-mcp-plugin-x86.dll ^
+    /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
 ```
 
 > `/TC` 强制将所有 `.c` 文件视为 C 源码。
+> `/I"sdk\zydis\include"` 包含 Zydis/Zycore 头文件。
+> `/DZYDIS_STATIC_BUILD /DZYCORE_STATIC_BUILD` 启用静态链接模式（无 .lib 依赖）。
 > `/O2` 是发布版开关。日常用发布版跑，出问题时用上面的调试版（`/Od /Zi`）来 VS 断点排查。
 
 ### 方式 2：手动设置 vcvars
@@ -93,23 +122,24 @@ call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build
 
 cd /d C:\Users\scydr\Desktop\123\nixiang-mcp\ce-mcp\ce-plugin
 del /q *.obj *.lib *.exp 2>nul
-cl /utf-8 /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x64.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
+cl /utf-8 /TC /LD /O2 /I"sdk\zydis\include" /I"sdk\zydis\src" plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c sdk\zydis\src\*.c sdk\zydis\src\API\*.c /DZYDIS_STATIC_BUILD /DZYCORE_STATIC_BUILD /Fe:ce-mcp-plugin-x64.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
 
 :: x86 编译（需要 x86 终端或 vcvars32.bat）
 call "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
 cd /d C:\Users\scydr\Desktop\123\nixiang-mcp\ce-mcp\ce-plugin
 del /q *.obj *.lib *.exp 2>nul
-cl /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c /Fe:ce-mcp-plugin-x86.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
+cl /TC /LD /O2 /I"sdk\zydis\include" /I"sdk\zydis\src" plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugin-gen.c sdk\zydis\src\*.c sdk\zydis\src\API\*.c /DZYDIS_STATIC_BUILD /DZYCORE_STATIC_BUILD /Fe:ce-mcp-plugin-x86.dll /link ws2_32.lib dbghelp.lib /DEF:ce-mcp-plugin.def
 ```
 
 ### 方式 3：VS IDE 创建项目
 
 1. **File** → **New** → **Project** → **Dynamic Link Library (DLL)**
-2. 添加所有 `.c` 文件和 `plugin.h`、`.def` 文件
+2. 添加所有 `.c` 文件和 `plugin.h`、`.def` 文件，以及 `sdk/zydis/src/` 和 `sdk/zydis/src/API/` 下的所有 `.c` 文件
 3. **Linker** → **Input** → **Additional Dependencies**: `ws2_32.lib; dbghelp.lib`
-4. **C/C++** → **General** → **Additional Include Directories**: 添加 `sdk/` 目录
-5. **C/C++** → **Advanced** → **Compile As**: `Compile as C Code (/TC)`
-6. Build
+4. **C/C++** → **General** → **Additional Include Directories**: 添加 `sdk/` 和 `sdk/zydis/include/` 目录
+5. **C/C++** → **Preprocessor** → **Preprocessor Definitions**: 添加 `ZYDIS_STATIC_BUILD` 和 `ZYCORE_STATIC_BUILD`
+6. **C/C++** → **Advanced** → **Compile As**: `Compile as C Code (/TC)`
+7. Build
 
 ### 编译参数
 
@@ -119,6 +149,10 @@ cl /TC /LD /O2 plugin-core.c plugin-debug.c plugin-analyze.c plugin-scan.c plugi
 | `/TC` | 强制 C 编译模式 |
 | `/LD` | 生成 DLL |
 | `/O2` | 优化速度 |
+| `/I"sdk\zydis\include"` | Zydis/Zycore 头文件路径 |
+| `/I"sdk\zydis\src"` | Zydis/Zycore 生成数据表 (.inc) 路径 |
+| `/DZYDIS_STATIC_BUILD` | Zydis 静态库模式（无 .lib 依赖） |
+| `/DZYCORE_STATIC_BUILD` | Zycore 静态库模式 |
 | `/Fe:` | 指定输出文件名 |
 | `/link` | 传递给链接器的参数 |
 | `/DEF:` | 模块定义文件 |
@@ -157,8 +191,13 @@ dumpbin /EXPORTS ce-mcp-plugin-x64.dll
 | `sym_nameToAddress` | L181 → BOOL | `pluginexports.pas:39` → param2: PPtrUInt |
 | `sym_addressToName` | L180 → BOOL | `pluginexports.pas:38` |
 | `sym_generateAPIHookScript` | L179 → BOOL (5参数) | `pluginexports.pas:417` → s.Text copy |
-| `previousOpcode` | L185 → DWORD (实际返回 ptrUint) | `pluginexports.pas:833` → ptrUint |
-| `nextOpcode` | L186 → DWORD (实际返回 ptrUint) | `pluginexports.pas:838` → ptrUint |
+| `previousOpcode` | L185 → UINT_PTR | `pluginexports.pas:833` → ptrUint |
+| `nextOpcode` | L186 → UINT_PTR | `pluginexports.pas:838` → ptrUint |
+| `Disassembler` | L170 `CEP_DISASSEMBLER` → BOOL | `pluginexports.pas:793` |
+| `disassembleEx` | L188 `CEP_DISASSEMBLEEX` (UINT_PTR* address) | `pluginexports.pas:811` → 反汇编后更新 *address |
+
+> **v0.5.0 修复**: `previousOpcode`/`nextOpcode` SDK 返回类型从 `DWORD`（32位）修正为 `UINT_PTR`（64位），修复 x64 下地址截断高位问题。
+> **v0.5.0 修复**: `Disassembler`/`disassembleEx` 在 CE 7.5 插件上下文中永远返回 FALSE（CE 内部缺陷），改用 Zydis 4.1.1 独立反汇编引擎。
 | `GetAddressFromPointer` | L178 → UINT_PTR | `pluginexports.pas:33` → dword (遍历 offsets) |
 | `ProcessList` | L176 → BOOL | `pluginexports.pas:567` → %08X-name\r\n 格式 |
 | `RegisterFunction` | L165 → int (pluginid) | `pluginexports.pas:19` → ptOnDebugEvent=2 |

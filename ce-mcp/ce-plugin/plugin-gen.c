@@ -12,6 +12,8 @@
  * Generates an AutoAssemble script that hooks the instruction at `address`.
  * If `jump_to` is provided, the hook redirects to that address/label.
  * The script includes ENABLE and DISABLE sections with original code restored.
+ *
+ * 使用 Zydis 解码目标地址指令，不依赖 CE 的 Disassembler（CE 7.5 缺陷）。
  */
 void cmd_GENERATE_HOOK(Command *cmd) {
     char *addrStr     = GetParam(cmd->params, 0);
@@ -25,30 +27,42 @@ void cmd_GENERATE_HOOK(Command *cmd) {
     if (caveSize < 64) caveSize = 64;
     if (caveSize > 65536) caveSize = 65536;
 
-    if (!Exported.Disassembler) {
-        ERR("disassembler not available");
-        return;
-    }
-
 #ifdef _WIN64
     int minHookLen = 14; /* absolute jmp [rip+disp] */
 #else
     int minHookLen = 5;  /* E9 relative jmp */
 #endif
 
+    /* 初始化 Zydis decoder */
+    ZydisDecoder decoder;
+#ifdef _WIN64
+    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LONG_64, ZYDIS_STACK_WIDTH_64);
+#else
+    ZydisDecoderInit(&decoder, ZYDIS_MACHINE_MODE_LEGACY_32, ZYDIS_STACK_WIDTH_32);
+#endif
+
+    ZydisFormatter formatter;
+    ZydisFormatterInit(&formatter, ZYDIS_FORMATTER_STYLE_INTEL);
+    ZydisFormatterSetProperty(&formatter, ZYDIS_FORMATTER_PROP_FORCE_SEGMENT, ZYAN_FALSE);
+    ZydisFormatterSetProperty(&formatter, ZYDIS_FORMATTER_PROP_FORCE_SIZE, ZYAN_FALSE);
+
     /* Accumulate instructions to cover minHookLen bytes */
     int hookSize = 0;
     UINT_PTR cur = addr;
     while (cur < addr + 64 && hookSize < minHookLen) {
-        char inst[256] = {0};
-        if (!Exported.Disassembler(cur, inst, sizeof(inst) - 1))
+        BYTE code[16];
+        SIZE_T bytesRead = 0;
+        if (!RPM(*Exported.OpenedProcessHandle, (LPCVOID)cur, code,
+                 sizeof(code), &bytesRead) || bytesRead == 0)
             break;
-        UINT_PTR nextCur = cur;
-        if (Exported.disassembleEx)
-            Exported.disassembleEx((UINT_PTR)&nextCur, NULL, 0);
-        int len = (int)(nextCur - cur);
-        if (len <= 0) break;
-        hookSize += len;
+
+        ZydisDecodedInstruction insn;
+        ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT];
+        ZyanStatus status = ZydisDecoderDecodeFull(&decoder, code, bytesRead,
+                                                    &insn, operands);
+        if (!ZYAN_SUCCESS(status) || insn.length == 0) break;
+
+        hookSize += insn.length;
         cur = addr + hookSize;
     }
 
@@ -97,29 +111,33 @@ void cmd_GENERATE_HOOK(Command *cmd) {
     pos += sprintf_s(script + pos, sizeof(script) - pos,
         "%s_original:\n", labelPrefix);
 
-    /* Emit original instruction bytes */
+    /* Emit original instruction bytes (Zydis decode) */
     cur = addr;
     while (cur < addr + (UINT_PTR)hookSize && pos < (int)sizeof(script) - 200) {
-        char inst[256] = {0};
-        if (!Exported.Disassembler(cur, inst, sizeof(inst) - 1))
+        BYTE code[16];
+        SIZE_T bytesRead = 0;
+        if (!RPM(*Exported.OpenedProcessHandle, (LPCVOID)cur, code,
+                 sizeof(code), &bytesRead) || bytesRead == 0)
             break;
 
-        UINT_PTR nextCur = cur;
-        if (Exported.disassembleEx)
-            Exported.disassembleEx((UINT_PTR)&nextCur, NULL, 0);
-        int len = (int)(nextCur - cur);
-        if (len <= 0) break;
+        ZydisDecodedInstruction insn;
+        ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT];
+        ZyanStatus status = ZydisDecoderDecodeFull(&decoder, code, bytesRead,
+                                                    &insn, operands);
+        if (!ZYAN_SUCCESS(status) || insn.length == 0) break;
 
-        BYTE raw[16] = {0};
-        SIZE_T bytesRead = 0;
-        RPM(*Exported.OpenedProcessHandle,
-            (LPCVOID)cur, raw, len, &bytesRead);
+        char asmBuf[256];
+        ZydisFormatterFormatInstruction(&formatter, &insn, operands,
+                                         insn.operand_count_visible,
+                                         asmBuf, sizeof(asmBuf),
+                                         cur, ZYAN_NULL);
+
         pos += sprintf_s(script + pos, sizeof(script) - pos, "  ");
-        for (SIZE_T b = 0; b < bytesRead; b++)
+        for (ZyanU8 b = 0; b < insn.length; b++)
             pos += sprintf_s(script + pos, sizeof(script) - pos,
-                             "%s%02X", b > 0 ? " " : "", raw[b]);
-        pos += sprintf_s(script + pos, sizeof(script) - pos, " // %s\n", inst);
-        cur += len;
+                             "%s%02X", b > 0 ? " " : "", code[b]);
+        pos += sprintf_s(script + pos, sizeof(script) - pos, " // %s\n", asmBuf);
+        cur += insn.length;
     }
     pos += sprintf_s(script + pos, sizeof(script) - pos,
         "  jmp %s_return\n\n", labelPrefix);
@@ -159,26 +177,30 @@ void cmd_GENERATE_HOOK(Command *cmd) {
 
     cur = addr;
     while (cur < addr + (UINT_PTR)hookSize && pos < (int)sizeof(script) - 200) {
-        char inst[256] = {0};
-        if (!Exported.Disassembler(cur, inst, sizeof(inst) - 1))
+        BYTE code[16];
+        SIZE_T bytesRead = 0;
+        if (!RPM(*Exported.OpenedProcessHandle, (LPCVOID)cur, code,
+                 sizeof(code), &bytesRead) || bytesRead == 0)
             break;
 
-        UINT_PTR nextCur = cur;
-        if (Exported.disassembleEx)
-            Exported.disassembleEx((UINT_PTR)&nextCur, NULL, 0);
-        int len = (int)(nextCur - cur);
-        if (len <= 0) break;
+        ZydisDecodedInstruction insn;
+        ZydisDecodedOperand operands[ZYDIS_MAX_OPERAND_COUNT];
+        ZyanStatus status = ZydisDecoderDecodeFull(&decoder, code, bytesRead,
+                                                    &insn, operands);
+        if (!ZYAN_SUCCESS(status) || insn.length == 0) break;
 
-        BYTE raw[16] = {0};
-        SIZE_T bytesRead = 0;
-        RPM(*Exported.OpenedProcessHandle,
-            (LPCVOID)cur, raw, len, &bytesRead);
+        char asmBuf[256];
+        ZydisFormatterFormatInstruction(&formatter, &insn, operands,
+                                         insn.operand_count_visible,
+                                         asmBuf, sizeof(asmBuf),
+                                         cur, ZYAN_NULL);
+
         pos += sprintf_s(script + pos, sizeof(script) - pos, "  ");
-        for (SIZE_T b = 0; b < bytesRead; b++)
+        for (ZyanU8 b = 0; b < insn.length; b++)
             pos += sprintf_s(script + pos, sizeof(script) - pos,
-                             "%s%02X", b > 0 ? " " : "", raw[b]);
-        pos += sprintf_s(script + pos, sizeof(script) - pos, " // %s\n", inst);
-        cur += len;
+                             "%s%02X", b > 0 ? " " : "", code[b]);
+        pos += sprintf_s(script + pos, sizeof(script) - pos, " // %s\n", asmBuf);
+        cur += insn.length;
     }
     pos += sprintf_s(script + pos, sizeof(script) - pos,
         "dealloc(%s_codecave)\n", labelPrefix);
@@ -210,8 +232,11 @@ void cmd_GENERATE_HOOK(Command *cmd) {
  * GENERATE_API_HOOK:address,jump_to(optional)
  *
  * Calls CE's built-in generateAPIHookScript. Returns the complete
- * AutoAssemble hook script. More reliable than manual GENERATE_HOOK
- * for API-level hooks.
+ * AutoAssemble hook script.
+ *
+ * 地址参数支持两种形式:
+ *   - 符号名如 "kernel32.CreateFileA" — 通过 sym_nameToAddress 解析为地址
+ *   - 十六进制地址如 "0x7FFC88051234" — 直接使用
  */
 void cmd_GENERATE_API_HOOK(Command *cmd) {
     char *addrStr   = GetParam(cmd->params, 0);
@@ -224,17 +249,41 @@ void cmd_GENERATE_API_HOOK(Command *cmd) {
         return;
     }
 
+    /* 如果传入的是符号名（非0x开头），先解析为地址 */
+    char resolvedAddr[64];
+    const char *inputAddr = addrStr;
+
+    if (!(addrStr[0] == '0' && (addrStr[1] == 'x' || addrStr[1] == 'X'))) {
+        /* 符号名 → 地址 */
+        if (!Exported.sym_nameToAddress) {
+            ERR("sym_nameToAddress not available, cannot resolve symbol: %s", addrStr);
+            return;
+        }
+
+        UINT_PTR addr = 0;
+        BOOL ok = Exported.sym_nameToAddress(addrStr, &addr);
+        if (!ok || addr == 0) {
+            ERR("failed to resolve symbol: %s", addrStr);
+            return;
+        }
+
+        sprintf_s(resolvedAddr, sizeof(resolvedAddr), "0x%llX",
+                  (unsigned long long)addr);
+        inputAddr = resolvedAddr;
+    }
+
     char script[4096];
     ZeroMemory(script, sizeof(script));
     BOOL ok = Exported.sym_generateAPIHookScript(
-        addrStr,                                    /* address (can be string/symbol) */
+        (char *)inputAddr,                          /* address as hex string */
         jumpToStr && jumpToStr[0] ? jumpToStr : "", /* jump target */
         "",                                         /* new call address (unused) */
         script,
         (int)sizeof(script) - 1);
 
     if (!ok) {
-        ERR("generateAPIHookScript failed for %s", addrStr);
+        ERR("generateAPIHookScript failed for %s (resolved: %s)",
+            addrStr, inputAddr);
         return;
     }
 
@@ -255,5 +304,6 @@ void cmd_GENERATE_API_HOOK(Command *cmd) {
     }
     jsonScript[jpos] = '\0';
 
-    OK("{\"address\":\"%s\",\"script\":\"%s\"}", addrStr, jsonScript);
+    OK("{\"address\":\"%s\",\"resolved\":\"%s\",\"script\":\"%s\"}",
+       addrStr, inputAddr, jsonScript);
 }

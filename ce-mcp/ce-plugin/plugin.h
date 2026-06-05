@@ -18,6 +18,10 @@
 #include <string.h>
 #include "sdk/cepluginsdk.h"
 
+/* Zydis 独立反汇编引擎 — 替代 CE 7.5 失效的 Disassembler/disassembleEx
+ * 宏 ZYDIS_STATIC_BUILD / ZYCORE_STATIC_BUILD 通过编译命令 /D 传入 */
+#include "sdk/zydis/include/Zydis/Zydis.h"
+
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "dbghelp.lib")
 

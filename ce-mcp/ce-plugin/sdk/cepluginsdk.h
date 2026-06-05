@@ -182,10 +182,10 @@ typedef BOOL (__stdcall *CEP_NAMETOADDRESS) (char *name, UINT_PTR *address);
 
 typedef VOID (__stdcall *CEP_LOADDBK32)(void);
 typedef BOOL (__stdcall *CEP_LOADDBVMIFNEEDED)(void);
-typedef DWORD (__stdcall *CEP_PREVIOUSOPCODE)(UINT_PTR address);
-typedef DWORD (__stdcall *CEP_NEXTOPCODE)(UINT_PTR address);
+typedef UINT_PTR (__stdcall *CEP_PREVIOUSOPCODE)(UINT_PTR address);
+typedef UINT_PTR (__stdcall *CEP_NEXTOPCODE)(UINT_PTR address);
 typedef BOOL (__stdcall *CEP_LOADMODULE)(char *modulepath, char *exportlist, int *maxsize);
-typedef BOOL (__stdcall *CEP_DISASSEMBLEEX)(UINT_PTR address, char *output, int maxsize);
+typedef BOOL (__stdcall *CEP_DISASSEMBLEEX)(UINT_PTR *address, char *output, int maxsize);
 typedef VOID (__stdcall *CEP_AA_ADDCOMMAND)(char *command);
 typedef VOID (__stdcall *CEP_AA_DELCOMMAND)(char *command);
 
