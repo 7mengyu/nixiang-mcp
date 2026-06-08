@@ -192,7 +192,6 @@ void cmd_ENUM_MEMORY_REGIONS(Command *cmd);
 void cmd_PREV_OPCODE(Command *cmd);
 void cmd_NEXT_OPCODE(Command *cmd);
 void cmd_ASSEMBLE(Command *cmd);
-void cmd_GENERATE_API_HOOK(Command *cmd);
 void cmd_RESOLVE_POINTER(Command *cmd);
 void cmd_GET_PROCESS_LIST(Command *cmd);
 void cmd_GET_RTTI_CLASS(Command *cmd);

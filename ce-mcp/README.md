@@ -75,7 +75,6 @@ CE 插件作为 TCP **客户端**，启动时自动连接 Python MCP Server。MC
 | `ce_memory_scan` | 精确值扫描（byte/word/dword/qword/float/double/string） | MEMORY_SCAN |
 | `ce_memory_scan_next` | 变/不变过滤链（链式调用逐步缩小范围） | MEMORY_SCAN_NEXT |
 | `ce_generate_hook` | 手动生成 AutoAssemble 注入脚本 | GENERATE_HOOK |
-| `ce_generate_api_hook` | CE 内置 API Hook 脚本生成（更可靠） | GENERATE_API_HOOK |
 
 ## 快速开始
 
@@ -152,7 +151,7 @@ ce-mcp/
 │   ├── plugin-debug.c         # 调试追踪（SET_BP / GET_REGISTERS / GET_CALLSTACK / REGISTER_TRACE）
 │   ├── plugin-analyze.c       # 分析命令（14 条：DISASSEMBLE / AOB_SCAN / PREV_OPCODE / ...）
 │   ├── plugin-scan.c          # 内存扫描（MEMORY_SCAN / MEMORY_SCAN_NEXT）
-│   ├── plugin-gen.c           # 脚本生成（GENERATE_HOOK / GENERATE_API_HOOK）
+│   ├── plugin-gen.c           # 脚本生成（GENERATE_HOOK）
 │   ├── ce-mcp-plugin.def      # DLL 导出符号
 │   ├── ce-mcp-plugin-x64.dll  # 预编译 x64 DLL
 │   ├── ce-mcp-plugin-x86.dll  # 预编译 x86 DLL

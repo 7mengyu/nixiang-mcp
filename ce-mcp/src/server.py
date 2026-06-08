@@ -326,25 +326,6 @@ def create_server() -> Server:
                 }
             ),
             Tool(
-                name="ce_generate_api_hook",
-                description="调用CE内置的 GenerateAPIHookScript 生成API Hook脚本。"
-                           "比 ce_generate_hook 更可靠（CE内部验证过的hook模板）。",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "address": {
-                            "type": "string",
-                            "description": "要hook的API地址或符号名"
-                        },
-                        "jump_to": {
-                            "type": "string",
-                            "description": "跳转目标地址（可选）"
-                        }
-                    },
-                    "required": ["address"]
-                }
-            ),
-            Tool(
                 name="ce_resolve_pointer",
                 description="解析多级指针链：base + offset1 + offset2 + ... 返回最终地址。"
                            "CE地址列表中常见的指针追踪模式。",
@@ -567,14 +548,6 @@ def create_server() -> Server:
                 instr = str(arguments["instruction"])
                 addr = str(arguments.get("address", ""))
                 result = await bridge.send_command("ASSEMBLE", f"{instr},{addr}")
-                return ok(result)
-
-            elif name == "ce_generate_api_hook":
-                addr = str(arguments["address"])
-                jmp = str(arguments.get("jump_to", ""))
-                result = await bridge.send_command(
-                    "GENERATE_API_HOOK", f"{addr},{jmp}"
-                )
                 return ok(result)
 
             elif name == "ce_resolve_pointer":

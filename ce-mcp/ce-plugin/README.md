@@ -27,7 +27,7 @@ ce-plugin/
 │                         #            ENUM_STRINGS/PING/READ_MEMORY/GET_MODULES/GET_PROCESS_LIST/
 │                         #            RESOLVE_POINTER)
 ├── plugin-scan.c         # 内存扫描 (MEMORY_SCAN/MEMORY_SCAN_NEXT)
-├── plugin-gen.c          # 脚本生成 (GENERATE_HOOK/GENERATE_API_HOOK)
+├── plugin-gen.c          # 脚本生成 (GENERATE_HOOK)
 ├── ce-mcp-plugin.def     # DLL 导出符号
 ├── sdk/cepluginsdk.h     # CE 7.5 SDK 头文件
 ├── sdk/lua.h             # Lua C API 头文件
@@ -48,7 +48,7 @@ ce-plugin/
 │       └── API/
 
 ../src/
-├── server.py             # MCP Server (23 个工具)
+├── server.py             # MCP Server (22 个工具)
 ├── bridge.py             # TCP 桥接
 └── __init__.py
 ```
@@ -254,7 +254,6 @@ dumpbin /EXPORTS ce-mcp-plugin-x64.dll
 | MEMORY_SCAN | 精确值内存扫描 (byte/word/dword/qword/float/double/string) | plugin-scan.c |
 | MEMORY_SCAN_NEXT | 变/不变过滤链 (链式调用逐步缩小) | plugin-scan.c |
 | GENERATE_HOOK | AOB 注入脚本手动生成 | plugin-gen.c |
-| GENERATE_API_HOOK | CE 内置 API Hook 脚本生成 (更可靠) | plugin-gen.c |
 
 ## MCP 工具 (23个)
 
@@ -305,4 +304,3 @@ Python MCP Server（`ce-mcp/src/server.py`）暴露了以下 MCP 工具：
 | `ce_memory_scan` | 精确值扫描 (byte/word/dword/qword/float/double/string) | MEMORY_SCAN |
 | `ce_memory_scan_next` | 变/不变过滤链 (链式调用逐步缩小范围) | MEMORY_SCAN_NEXT |
 | `ce_generate_hook` | 手动生成 AutoAssemble 注入脚本 | GENERATE_HOOK |
-| `ce_generate_api_hook` | CE 内置 API Hook 脚本生成 (更可靠) | GENERATE_API_HOOK |

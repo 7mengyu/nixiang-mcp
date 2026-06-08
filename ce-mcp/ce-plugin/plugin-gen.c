@@ -1,7 +1,7 @@
 /**
  * plugin-gen.c — 脚本生成命令
  *
- * GENERATE_HOOK / GENERATE_API_HOOK
+ * GENERATE_HOOK
  */
 
 #include "plugin.h"
@@ -228,82 +228,4 @@ void cmd_GENERATE_HOOK(Command *cmd) {
        labelPrefix, jsonScript);
 }
 
-/**
- * GENERATE_API_HOOK:address,jump_to(optional)
- *
- * Calls CE's built-in generateAPIHookScript. Returns the complete
- * AutoAssemble hook script.
- *
- * 地址参数支持两种形式:
- *   - 符号名如 "kernel32.CreateFileA" — 通过 sym_nameToAddress 解析为地址
- *   - 十六进制地址如 "0x7FFC88051234" — 直接使用
- */
-void cmd_GENERATE_API_HOOK(Command *cmd) {
-    char *addrStr   = GetParam(cmd->params, 0);
-    char *jumpToStr = GetParam(cmd->params, 1);
-
-    if (!addrStr) { ERR("missing address"); return; }
-
-    if (!Exported.sym_generateAPIHookScript) {
-        ERR("sym_generateAPIHookScript not available");
-        return;
-    }
-
-    /* 如果传入的是符号名（非0x开头），先解析为地址 */
-    char resolvedAddr[64];
-    const char *inputAddr = addrStr;
-
-    if (!(addrStr[0] == '0' && (addrStr[1] == 'x' || addrStr[1] == 'X'))) {
-        /* 符号名 → 地址 */
-        if (!Exported.sym_nameToAddress) {
-            ERR("sym_nameToAddress not available, cannot resolve symbol: %s", addrStr);
-            return;
-        }
-
-        UINT_PTR addr = 0;
-        BOOL ok = Exported.sym_nameToAddress(addrStr, &addr);
-        if (!ok || addr == 0) {
-            ERR("failed to resolve symbol: %s", addrStr);
-            return;
-        }
-
-        sprintf_s(resolvedAddr, sizeof(resolvedAddr), "%llX",
-                  (unsigned long long)addr);
-        inputAddr = resolvedAddr;
-    }
-
-    char script[4096];
-    ZeroMemory(script, sizeof(script));
-    BOOL ok = Exported.sym_generateAPIHookScript(
-        (char *)inputAddr,                          /* address as hex string */
-        jumpToStr && jumpToStr[0] ? jumpToStr : "", /* jump target */
-        "",                                         /* new call address (unused) */
-        script,
-        (int)sizeof(script) - 1);
-
-    if (!ok) {
-        ERR("generateAPIHookScript failed for %s (resolved: %s)",
-            addrStr, inputAddr);
-        return;
-    }
-
-    /* JSON-escape the script */
-    char jsonScript[8192];
-    int jpos = 0;
-    for (int i = 0; script[i] && jpos < (int)sizeof(jsonScript) - 4; i++) {
-        switch (script[i]) {
-            case '"':  jpos += sprintf_s(jsonScript + jpos, sizeof(jsonScript) - jpos, "\\\""); break;
-            case '\\': jpos += sprintf_s(jsonScript + jpos, sizeof(jsonScript) - jpos, "\\\\"); break;
-            case '\n': jpos += sprintf_s(jsonScript + jpos, sizeof(jsonScript) - jpos, "\\n"); break;
-            case '\r': jpos += sprintf_s(jsonScript + jpos, sizeof(jsonScript) - jpos, "\\r"); break;
-            case '\t': jpos += sprintf_s(jsonScript + jpos, sizeof(jsonScript) - jpos, "\\t"); break;
-            default:
-                if (script[i] >= 0x20 && script[i] < 0x7F)
-                    jsonScript[jpos++] = script[i];
-        }
-    }
-    jsonScript[jpos] = '\0';
-
-    OK("{\"address\":\"%s\",\"resolved\":\"%s\",\"script\":\"%s\"}",
-       addrStr, inputAddr, jsonScript);
-}
+/* cmd_GENERATE_API_HOOK removed in v0.5.2 — ce_generate_hook 替代 */

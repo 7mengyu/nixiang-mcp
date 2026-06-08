@@ -386,7 +386,6 @@ void ExecuteCommand(Command *cmd) {
     else if (strcmp(cmd->command, "PREV_OPCODE") == 0) cmd_PREV_OPCODE(cmd);
     else if (strcmp(cmd->command, "NEXT_OPCODE") == 0) cmd_NEXT_OPCODE(cmd);
     else if (strcmp(cmd->command, "ASSEMBLE") == 0) cmd_ASSEMBLE(cmd);
-    else if (strcmp(cmd->command, "GENERATE_API_HOOK") == 0) cmd_GENERATE_API_HOOK(cmd);
     else if (strcmp(cmd->command, "RESOLVE_POINTER") == 0) cmd_RESOLVE_POINTER(cmd);
     else if (strcmp(cmd->command, "GET_PROCESS_LIST") == 0) cmd_GET_PROCESS_LIST(cmd);
     else if (strcmp(cmd->command, "GET_RTTI_CLASS") == 0) cmd_GET_RTTI_CLASS(cmd);
